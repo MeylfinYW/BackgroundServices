@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -28,6 +29,8 @@ class TrackerService : Service(), SensorEventListener {
     private val NOTIFICATION_ID_SERVICE_RUNNING = 1
     private val NOTIFICATION_ID_JUMP_DETECTED = 2
 
+    private var isLatihanMode = false
+
     override fun onCreate() {
         super.onCreate()
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -38,10 +41,21 @@ class TrackerService : Service(), SensorEventListener {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d("TrackerService", "Service onStartCommand")
-        startForeground(
-            NOTIFICATION_ID_SERVICE_RUNNING,
-            buildServiceRunningNotification()
-        )
+        isLatihanMode = intent?.getBooleanExtra("IS_LATIHAN", false) ?: false
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID_SERVICE_RUNNING,
+                buildServiceRunningNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            )
+        } else {
+            startForeground(
+                NOTIFICATION_ID_SERVICE_RUNNING,
+                buildServiceRunningNotification()
+            )
+        }
+
         startJumpDetection()
         return START_STICKY
     }
@@ -84,9 +98,12 @@ class TrackerService : Service(), SensorEventListener {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val titleText = if (isLatihanMode) "Latihan Berjalan" else "Pelacak Aktivitas Latar"
+        val contentText = if (isLatihanMode) "Sedang merekam latihan Anda..." else "Aplikasi Tracker Services sedang berjalan..."
+
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID_SERVICE_RUNNING)
-            .setContentTitle("Pelacak Aktivitas Latar")
-            .setContentText("Aplikasi Tracker Services sedang berjalan...")
+            .setContentTitle(titleText)
+            .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
             .setContentIntent(pendingIntent)
@@ -139,7 +156,7 @@ class TrackerService : Service(), SensorEventListener {
     }
 
     override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
-
+        
     }
 
     override fun onDestroy() {
