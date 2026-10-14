@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.CalendarContract
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -15,6 +16,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var statusTextView: TextView
     private lateinit var btnStart: Button
+    private lateinit var btnStartLatihan: Button
 
     private val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         arrayOf(
@@ -33,6 +35,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val ACTION_SERVICE_STOPPED_JUMP = "com.example.backgroundservices.ACTION_SERVICE_STOPPED_JUMP"
+        const val ACTION_LATIHAN_DONE = "com.example.backgroundservices.ACTION_LATIHAN_DONE"
         const val REQUEST_CODE_PERMISSIONS = 101
     }
 
@@ -42,12 +45,25 @@ class MainActivity : AppCompatActivity() {
 
         statusTextView = findViewById(R.id.statusTextView)
         btnStart = findViewById(R.id.btnStart)
+        btnStartLatihan = findViewById(R.id.btnStartLatihan)
 
         handleIntent(intent)
 
         btnStart.setOnClickListener {
             if (hasAllPermissions()) {
-                startTrackerService()
+                startTrackerService(isLatihan = false)
+            } else {
+                ActivityCompat.requestPermissions(
+                    this,
+                    permissionsToRequest,
+                    REQUEST_CODE_PERMISSIONS
+                )
+            }
+        }
+
+        btnStartLatihan.setOnClickListener {
+            if (hasAllPermissions()) {
+                startTrackerService(isLatihan = true)
             } else {
                 ActivityCompat.requestPermissions(
                     this,
@@ -64,10 +80,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun startTrackerService() {
-        val serviceIntent = Intent(this, TrackerService::class.java)
+    private fun startTrackerService(isLatihan: Boolean) {
+        val serviceIntent = Intent(this, TrackerService::class.java).apply {
+            putExtra("IS_LATIHAN", isLatihan)
+        }
         ContextCompat.startForegroundService(this, serviceIntent)
-        statusTextView.text = "Background service sedang berjalan..."
+
+        statusTextView.text = if (isLatihan) {
+            "Latihan dimulai! Silakan melompat..."
+        } else {
+            "Background service sedang berjalan..."
+        }
     }
 
     override fun onRequestPermissionsResult(
@@ -85,8 +108,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             if (allPermissionsGranted) {
-                val serviceIntent = Intent(this, TrackerService::class.java)
-                ContextCompat.startForegroundService(this, serviceIntent)
+                startTrackerService(isLatihan = false)
                 finish()
             } else {
                 statusTextView.text = "Izin ditolak, service tidak dapat dijalankan."
@@ -97,7 +119,22 @@ class MainActivity : AppCompatActivity() {
     private fun handleIntent(intent: Intent?) {
         if (intent?.action == ACTION_SERVICE_STOPPED_JUMP) {
             statusTextView.text = "Background services sudah berhenti karena Anda melompat"
+        } else if (intent?.action == ACTION_LATIHAN_DONE) {
+            val totalJump = intent.getIntExtra("TOTAL_JUMP", 0)
+            statusTextView.text = "Latihan Selesai!\nJumlah Lompatan: $totalJump"
+            addCalendarEvent(totalJump)
         }
+    }
+
+    private fun addCalendarEvent(totalJump: Int) {
+        val calendarIntent = Intent(Intent.ACTION_INSERT).apply {
+            data = CalendarContract.Events.CONTENT_URI
+            putExtra(CalendarContract.Events.TITLE, "Latihan Lompat Selesai")
+            putExtra(CalendarContract.Events.DESCRIPTION, "Berhasil menyelesaikan latihan dengan $totalJump lompatan.")
+            putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, System.currentTimeMillis())
+            putExtra(CalendarContract.EXTRA_EVENT_END_TIME, System.currentTimeMillis() + 60 * 60 * 1000)
+        }
+        startActivity(calendarIntent)
     }
 
     override fun onNewIntent(intent: Intent) {

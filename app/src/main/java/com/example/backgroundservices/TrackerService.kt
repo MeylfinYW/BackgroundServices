@@ -129,7 +129,7 @@ class TrackerService : Service(), SensorEventListener {
                     if (isLatihanMode) {
                         if (jumpCount >= 2) {
                             sensorManager.unregisterListener(this)
-                            showJumpNotification()
+                            showLatihanDoneNotification(jumpCount)
                             stopSelf()
                         }
                     } else {
@@ -174,9 +174,35 @@ class TrackerService : Service(), SensorEventListener {
         }
     }
 
-    override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
+    private fun showLatihanDoneNotification(totalJump: Int) {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            action = MainActivity.ACTION_LATIHAN_DONE
+            putExtra("TOTAL_JUMP", totalJump)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
 
+        val pendingIntent = PendingIntent.getActivity(
+            this, 2, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID_JUMP_DETECTED)
+            .setContentTitle("Latihan Selesai!")
+            .setContentText("Total $totalJump lompatan terdeteksi. Ketuk untuk simpan ke Kalender.")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
+
+        try {
+            NotificationManagerCompat.from(this).notify(3, notification)
+        } catch (e: SecurityException) {
+            Log.e("TrackerService", "Gagal memunculkan notifikasi latihan: ${e.message}")
+        }
     }
+
+    override fun onAccuracyChanged(p0: Sensor?, p1: Int) {}
 
     override fun onDestroy() {
         super.onDestroy()
