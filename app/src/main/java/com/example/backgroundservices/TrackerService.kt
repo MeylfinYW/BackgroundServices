@@ -30,6 +30,8 @@ class TrackerService : Service(), SensorEventListener {
     private val NOTIFICATION_ID_JUMP_DETECTED = 2
 
     private var isLatihanMode = false
+    private var jumpCount = 0
+    private var isJumping = false
 
     override fun onCreate() {
         super.onCreate()
@@ -42,6 +44,8 @@ class TrackerService : Service(), SensorEventListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d("TrackerService", "Service onStartCommand")
         isLatihanMode = intent?.getBooleanExtra("IS_LATIHAN", false) ?: false
+        jumpCount = 0
+        isJumping = false
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
@@ -114,13 +118,28 @@ class TrackerService : Service(), SensorEventListener {
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
             val y = event.values[1]
-            val jumpThreshold = 15.0
+            val threshold = if (isLatihanMode) 12.0 else 15.0
 
-            if (abs(y) > jumpThreshold) {
-                Log.d("TrackerService", "LOMPATAN terdeteksi! (y: $y)")
-                sensorManager.unregisterListener(this)
-                showJumpNotification()
-                stopSelf()
+            if (abs(y) > threshold) {
+                if (!isJumping) {
+                    isJumping = true
+                    jumpCount++
+                    Log.d("TrackerService", "Lompatan ke-$jumpCount terdeteksi! (y: $y)")
+
+                    if (isLatihanMode) {
+                        if (jumpCount >= 2) {
+                            sensorManager.unregisterListener(this)
+                            showJumpNotification()
+                            stopSelf()
+                        }
+                    } else {
+                        sensorManager.unregisterListener(this)
+                        showJumpNotification()
+                        stopSelf()
+                    }
+                }
+            } else if (abs(y) < 10.0) {
+                isJumping = false
             }
         }
     }
@@ -156,7 +175,7 @@ class TrackerService : Service(), SensorEventListener {
     }
 
     override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
-        
+
     }
 
     override fun onDestroy() {
