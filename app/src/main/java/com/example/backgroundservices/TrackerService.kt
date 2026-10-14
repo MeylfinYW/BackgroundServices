@@ -138,9 +138,9 @@ class TrackerService : Service(), SensorEventListener {
         }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    override fun onAccuracyChanged(p0: Sensor?, p1: Int) {
 
-
+    }
 
     override fun onDestroy() {
         super.onDestroy()
